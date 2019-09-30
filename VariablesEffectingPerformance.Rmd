@@ -1,0 +1,194 @@
+---
+title: "VariablesEffectingPerformance"
+author: "David A Hughes"
+date: "27/09/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## load necessary libraries
+invisible( library(tidyverse) )
+library(readxl)
+library(corrplot)
+```
+
+## What are the variables that are influencing the performance of our experiments??
+
+  1. First how do we define and/or measure performance ?
+    + the number of reliable reads: reads retained after QC and mapping filtering (secondary alignments and mapping quality score < 30)
+    + enrichment factor (EF): (reliable-on-target reads / production reads ) / (target space/genomic space)
+    + library complexity (LC): # reliable reads / total number of mapped reads, including duplicates 
+    + capture sensitivity (CS): # of target regions covered by 1 read / total number of target regions
+    + capture specificity (CSp): reliable-on-target / reliable reads  
+  2. What are some of the variable that we think may influence performance?
+    + geogrpahic sampling site
+    + % endogenous DNA
+    + DNA fragment size
+    + the sample poolit belongs to
+    + the hybridization
+    + production or sequencing reads acquired for a sample/hybridization
+    + pipeting volume used to make a library 
+    + pipeting volume used to make the pool
+
+
+```{r}
+#######################
+## Read in the data
+#######################
+n = excel_sheets("data/SupplementaryMaterial2.xlsx")
+##
+mydata = sapply(1:length(n), function(x){
+  read_excel("data/SupplementaryMaterial2.xlsx", sheet = x)
+  })
+names(mydata) = n
+
+#######################
+## What data is available 
+## in each sheet ?
+#######################
+lapply(mydata, names)
+```
+
+### Add the data from Table S2 to Table S4
+
+```{r}
+m = match( unlist( mydata[[4]][,1] ), unlist( mydata[[2]][,1]  ) )
+
+mydata[[4]] =  as_tibble( cbind( mydata[[4]][,1], mydata[[2]][m, -1], mydata[[4]][, -1] ) )
+
+## convert characters to factors
+# mydata[[4]] %>% mutate_if(is.character, as.factor) %>% str()
+
+mydata[[4]] = mydata[[4]] %>% mutate_if(is.character, as.factor)
+```
+
+## A function for estimating correlations with numbers and factors
+
+```{r}
+## A function to estimate the correlatino among two factors
+factor_on_factor = function(x,y){
+  mytable = table(x,y)
+  chi2test = chisq.test(mytable, correct=F)
+  N = sum(chi2test$observed)
+  chi2 = chi2test$statistic
+  pval = chi2test$p.value
+  ## summary stats
+  k <- min(dim(chi2test$observed))
+  V <- sqrt(chi2/(N * (k - 1)))
+        
+  out = c(V, chi2, pval)
+  names(out) = c("Crammers_V", "Chi2_stat", "Chi2_pval")
+  return(out)
+}
+
+## A function to estimate the correlatino among a factor and a number variable
+factor_on_numeric = function( cat_values , num_values ){
+  wdata = data.frame( cat_values = unlist(cat_values) , num_values = unlist(num_values) )
+  fit = lm(num_values ~ cat_values , data = wdata)
+  adjrsq = summary(fit)$adj.r.squared
+  ####
+  a = anova(fit)
+  etasq = a[1,2]/sum(a[,2])
+  rho = sqrt(etasq)
+  fstat = a[1,4]
+  pval = a[1,5]
+  out = c( etasq , rho,  fstat, pval)
+  names(out) = c("Etasq", "rho", "Fstat", "Anova_pval")
+  return(out)
+}
+
+## A function to estimate the correlatino among a factor and a number variable
+numeric_on_numeric = function( x , y ){
+  sptest = cor.test( unlist(x) , unlist(y), method = "sp")
+  ##
+  out = c( sptest$estimate , sptest$p.value)
+  names(out) = c("rho",  "Sp_rho_pval")
+  return(out)
+}
+
+### Function to estimate correlations across a data frame or factors and numbers
+Test_DF_Correlations = function(df){
+  rhomat = pvalmat = matrix(NA, ncol(df), ncol(df))
+  diag(rhomat) = diag(pvalmat) = 1
+  for(i in 1:ncol(df)){
+    for(j in 1:ncol(df)){
+      x = unlist(df[,i]);  y = unlist(df[,j])
+      if(class(x) == "factor" & class(y) == "factor" ){
+        test = factor_on_factor(x,y)
+        rhomat[i,j] = test[1]
+        pvalmat[i,j] = test[3]
+      } else{
+        if(class(x) == "numeric" & class(y) == "numeric"){
+          test = numeric_on_numeric(x,y)
+          rhomat[i,j] = test[1]
+          pvalmat[i,j] = test[2]
+        }else{
+          if( class(x) == "factor"){
+            test = factor_on_numeric(cat_values = x , num_values = y)
+            rhomat[i,j] = test[1]
+            pvalmat[i,j] = test[2]
+          } else {
+            test = factor_on_numeric(cat_values = y , num_values = x)
+            rhomat[i,j] = test[1]
+            pvalmat[i,j] = test[2]
+            }
+          }
+        }
+      }
+  }
+  out = list(RhoMat = rhomat, PvalMat = pvalmat)
+  return(out)
+  }
+
+```
+
+
+```{r, error=FALSE, warning=FALSE, message=FALSE}
+CorMat = Test_DF_Correlations(mydata[[4]]) 
+rownames(CorMat[[1]]) = colnames(CorMat[[1]]) = names( mydata[[4]] )
+rownames(CorMat[[2]]) = colnames(CorMat[[2]]) = names( mydata[[4]] )
+```
+
+
+```{r, fig.width = 15, fig.height = 10}
+corrplot(CorMat[[1]][-1,-1], 
+         order = "hclust",
+         addrect = 6,
+         tl.col = "red", 
+         tl.cex = 0.95,  
+         tl.srt = 45, method = "cir",
+         p.mat = CorMat[[2]][-1,-1],
+         insig = "label_sig",
+         sig.level = c(.001, .01, .05), 
+         #sig.level = 0.05,
+         pch.cex = 1.25, 
+         pch.col = "purple")
+
+
+```
+
+
+## Intercorrelation among performance measures
+
+```{r, fig.with = 15, fig.height = 10}
+CorMat = cor(mydata[[3]][, -c(1:3)], method = "sp", use = "pair")
+
+res1 <- cor.mtest(mtcars, conf.level = .95)
+
+corrplot(CorMat, 
+         order = "hclust",
+         addrect = 6,
+         tl.col = "red", 
+         tl.cex = 0.95,  
+         tl.srt = 45, method = "cir" )
+
+```
+
+
+```{r}
+colnames(mydata[[3]])
+```
+
+
