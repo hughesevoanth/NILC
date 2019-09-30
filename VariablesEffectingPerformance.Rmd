@@ -163,10 +163,8 @@ corrplot(CorMat[[1]][-1,-1],
          insig = "label_sig",
          sig.level = c(.001, .01, .05), 
          #sig.level = 0.05,
-         pch.cex = 1.25, 
+         pch.cex = 1.0, 
          pch.col = "purple")
-
-
 ```
 
 
