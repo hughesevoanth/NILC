@@ -14,6 +14,8 @@ library(readxl)
 library(corrplot)
 library(RColorBrewer)
 library(viridis)
+library(gridExtra)
+#library(cowplot)
 ```
 
 ## What are the variables that are influencing the performance of our experiments??
@@ -34,6 +36,7 @@ library(viridis)
     + pipeting volume used to make a library 
     + pipeting volume used to make the pool
 
+### Read in the data and report the variables available in each table
 
 ```{r}
 #######################
@@ -53,7 +56,9 @@ names(mydata) = n
 lapply(mydata, names)
 ```
 
-### Add the data from Table S2 to Table S4
+## Add the data from Table S2 to Table S4 
+
+ - include a new variable accounting for the total amount of DNA used in a hybridization
 
 ```{r}
 m = match( unlist( mydata[[4]][,1] ), unlist( mydata[[2]][,1]  ) )
@@ -71,9 +76,34 @@ wdata = mydata[[4]]
 wdata = wdata %>% mutate(TotalDNA_inHyb = 1)
 w = which(wdata$`Sequencing Batch` == 'SeqBatch 3')
 wdata$TotalDNA_inHyb[w] = 2
+
 ```
 
-## A function for estimating correlations with numbers and factors
+
+
+## Add the data from Table S2 to Table Downsampled
+
+ - include a new variable accounting for the total amount of DNA used in a hybridization
+
+```{r}
+m = match( unlist( mydata[[6]][,1] ), unlist( mydata[[6]][,1]  ) )
+
+mydata[[6]] =  as_tibble( cbind( mydata[[6]][,1], mydata[[2]][m, -1], mydata[[6]][, -1] ) )
+
+## convert characters to factors
+# mydata[[4]] %>% mutate_if(is.character, as.factor) %>% str()
+
+mydata[[6]] = mydata[[6]] %>% mutate_if(is.character, as.factor)
+
+## Set the working data frame to wdata
+downdata = mydata[[6]]
+
+downdata = downdata %>% mutate(TotalDNA_inHyb = 1)
+w = which(downdata$`Sequencing Batch` == 'SeqBatch 3')
+downdata$TotalDNA_inHyb[w] = 2
+
+```
+## A function for estimating correlations with numbers (continuous) and factors (categorical)
 
 ```{r}
 ## A function to estimate the correlatino among two factors
@@ -177,6 +207,33 @@ corrplot(CorMat[[1]][-1,-1],
 ```
 
 
+## Correlation matrix for the downsampled data
+
+```{r, error=FALSE, warning=FALSE, message=FALSE}
+DownCorMat = Test_DF_Correlations( downdata ) 
+rownames(DownCorMat[[1]]) = colnames(DownCorMat[[1]]) = names( downdata )
+rownames(DownCorMat[[2]]) = colnames(DownCorMat[[2]]) = names( downdata )
+```
+
+
+```{r, fig.width = 15, fig.height = 10}
+corrplot(DownCorMat[[1]][-1,-1], 
+         order = "hclust",
+         addrect = 7,
+         tl.col = "red", 
+         tl.cex = 0.95,  
+         tl.srt = 45, method = "cir",
+         p.mat = DownCorMat[[2]][-1,-1],
+         insig = "label_sig",
+         sig.level = c(.001, .01, .05), 
+         #sig.level = 0.05,
+         pch.cex = 1.0, 
+         pch.col = "purple")
+```
+
+
+## How are production reads influencing library complexity ?
+
 ```{r, fig.width = 10, fig.height = 8}
 w = which(is.na(wdata$`Production Reads`))
 pcol = brewer.pal(9, "Blues")[-1] 
@@ -197,7 +254,112 @@ wdata[-w,] %>% ggplot( aes(x = `Production Reads`, y = `Library Complexity (LC)`
 
 ```
 
+  1. Samples in SeqBatch 3 all had 2ug of in the hybridization, hence the large bump in LC.
+  2. Drowning the data in useless sequencing also appears to have had a negative effect on LC.
+ 
+ What can we learn from these observations?
+  1. Increase the total DNA concentration in hybridization reactions (Perry paper did this)
+  2. Do not sequence to deeply. 
+
+
+## How are production reads influencing library complexity in the down sampled data ?
+
+```{r, fig.width = 20, fig.height = 8}
+w = which(downdata$`Production Reads` < 1500000)
+
+pcol = brewer.pal(9, "Blues")[-1] 
+## a ramp of colors 
+pcol = colorRampPalette( pcol )(19)
+
+################################
+##  DP1
+################################
+
+p = downdata[-w,] %>% ggplot( aes(x = `DP1`, y = `LC`)) +
+  geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `Production Reads`), alpha = 0.8 ) +
+  geom_smooth(method = "loess", color = "black") +
+  scale_shape_manual(values=c(21, 22, 23)) +
+  scale_fill_brewer(palette = "Set1") +
+  #scale_fill_manual(values = pcol) +
+  guides(fill = guide_legend(override.aes = list(size = 5) ) ) +
+  labs(title = "LC and Capture sensitivity at DP1", 
+       subtitle ="   ...  as structured by sequencing batch",
+       x = "CS @ DP1") 
+
+##################
+
+
+
+p1 = p + downdata[w,] %>%
+  geom_point(mapping = aes(x = `DP1`, y = `LC`, 
+                           fill = `Sequencing Batch`, 
+                           shape = `Sequencing Batch`,  
+                           size = `Production Reads`), alpha = 0.8 ) + 
+  theme(legend.position = "none")
+
+################################
+##  DP4
+################################
+p = downdata[-w,] %>% ggplot( aes(x = `DP4`, y = `LC`)) +
+  geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `Production Reads`), alpha = 0.8 ) +
+  geom_smooth(method = "loess", color = "black") +
+  scale_shape_manual(values=c(21, 22, 23)) +
+  scale_fill_brewer(palette = "Set1") +
+  #scale_fill_manual(values = pcol) +
+  guides(fill = guide_legend(override.aes = list(size = 5) ) ) +
+  labs(title = "LC and Capture sensitivity at DP4", 
+       subtitle ="   ...  as structured by sequencing batch",
+       x = "CS @ DP4") 
+
+##################
+
+p4 = p + downdata[w,] %>%
+  geom_point(mapping = aes(x = `DP4`, y = `LC`, 
+                           fill = `Sequencing Batch`, 
+                           shape = `Sequencing Batch`,  
+                           size = `Production Reads`), alpha = 0.8 ) + 
+  theme(legend.position = "none")
+
+################################
+##  DP10
+################################
+p = downdata[-w,] %>% ggplot( aes(x = `DP10`, y = `LC`)) +
+  geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `Production Reads`), alpha = 0.8 ) +
+  geom_smooth(method = "loess", color = "black") +
+  scale_shape_manual(values=c(21, 22, 23)) +
+  scale_fill_brewer(palette = "Set1") +
+  #scale_fill_manual(values = pcol) +
+  guides(fill = guide_legend(override.aes = list(size = 5) ) ) +
+  labs(title = "LC and Capture sensitivity at DP10", 
+       subtitle ="   ...  as structured by sequencing batch",
+       x = "CS @ DP10") 
+
+##################
+
+p10 = p + downdata[w,] %>%
+  geom_point(mapping = aes(x = `DP10`, y = `LC`, 
+                           fill = `Sequencing Batch`, 
+                           shape = `Sequencing Batch`,  
+                           size = `Production Reads`), alpha = 0.8 ) 
+
+l = cowplot::get_legend(p)
+
+p10 = p10 + theme(legend.position = "none")
+
+
+grid.arrange(p1, p4, p10, l, nrow = 1, widths = c(4,4,4,1))
+
+```
+
+
 ## Capture Sensitivity
+
+It would be useful to identify a single summary statistic that summarizes what a good "performing" target capture seqeuencing experiment is. I think what we be most useful is to count the number of (population-wide) variable position that we were able to genotype (at whatever criteria uniformly executed across all samples). In the absence of this data it would seem that the best summary statistic that would predict this number is Capture Sensitivity (# of target regions covered by 1 read / total number of target regions), as having a base covered by a read provides a chance for genotyping. 
+
+Now depth in coverage gives us accuracy in genotyping heterozygosity and there is most certainly going to be some bias in capturing specific alleles, but we have some good evidence that just making hemizygous calls is informative for the gross|macro level population genetics we would like to do. However, this should eventually be quantified. 
+
+### Below we are asking in a univariate fashion how each of our variables, and sumstat,  correlate with CAPTURE SENSITIVITY. 
+
 
 ```{r, fig.width = 15, fig.height = 8}
 
@@ -224,7 +386,43 @@ df$ID <- factor(df$ID, levels = df$ID)
 
 ```
 
-## Build a network of relationships
+What can we learn from this analysis?
+
+  1. Want to increase capture sensitivity aquire more unique reads !
+    + kind of obvious but great to observe and demonstrate. 
+  2. For technical or methodological choices it would appear that
+    + samples with more Endogenous DNA, (note that this is NOT %DNA), it is higher DNA [concentrations] perform better
+    + captures with more DNA in the hybridization perform better
+
+### Below we are asking in a univariate fashion how each of our variables, and sumstat, correlate with CAPTURE SENSITIVITY at a uniform production
+
+```{r, fig.width = 20, fig.height = 8}
+
+#x = sort( CorMat[[1]][-26,26] ); barplot(x)
+
+df = tibble( ID = colnames( DownCorMat[[1]] ) , 
+             CS_cor = unlist( DownCorMat[[1]][,"DP1"]),
+             CS_pval = unlist( DownCorMat[[2]][,"DP1"]))
+df = df[-c(1,2,4,27:31), ]
+
+## change order to increasing values
+o = order(df$CS_cor)
+df = df[o,]
+#df = df[1:25, ]
+### set ploting order with factor 
+df$ID <- factor(df$ID, levels = df$ID)
+
+### plot
+(
+  p <- df %>% ggplot( aes( x = ID, y = CS_cor ) ) +
+    geom_bar(stat="identity", aes(fill = log10(CS_pval) )) +
+    labs(title = "Capture Sensitivity correlation") +
+    theme(axis.text.x = element_text(angle = 45,  hjust = 1))
+)
+
+```
+
+## Build a network of relationships based on correaltion estimates
 
 ```{r, message=FALSE, fig.width = 15, fig.height = 10}
 #library(network)
@@ -299,6 +497,7 @@ legend("bottomleft",
 ## Data Reductions
 #############################
 
+### to do computationally -- LATER
 
 #############################
 ## Make Adjecency Matrix
@@ -361,6 +560,164 @@ legend("topleft",
 
 ```
 
+
+## Remove redundancies in Network and construct with down sampled data
+
+```{r, message=FALSE, fig.width = 10, fig.height = 10}
+#############################
+## Data Reductions
+#############################
+
+Dmat = as.dist( na.omit( 1 - abs(DownCorMat[[1]]) ) )
+tree = hclust(Dmat, method = "complete")
+# plot(tree, hang = -1)
+
+#############################
+## Make Adjecency Matrix
+#############################
+
+# x = CorMat[[2]][-c(1:4), -c(1:4)]
+# adjMat = x
+# adjMat[ x > 0.00001] = 0
+# adjMat[ x <= 0.00001] = 1
+# diag(adjMat) = 0
+r = c(1:4, 12, 14, 16, 17,20, 21, 22, 28:31)
+x = DownCorMat[[1]][-r, -r]
+adjMat = abs( x )
+adjMat[adjMat < 0.5] = 0
+
+#############################
+## Categorize the Nodes
+#############################
+n = colnames(adjMat)
+nodecats = c( rep("Sample", 3), rep("Methodological", 3), rep("Outcome",6), rep("SumStat", 4 ), "Methodological" )
+pcol_o = brewer.pal(nlevels(as.factor(nodecats)), "Set1")
+pcol <- pcol_o[as.numeric(as.factor(nodecats))]
+
+#############################
+## Generate network
+#############################
+network <- graph_from_adjacency_matrix(adjMat, weighted=T, mode="undirected", diag=F)
+
+## estimate degree for each node
+deg <- degree(network, mode="all")
+
+#############################
+## Make Plot
+#############################
+par(bg="grey33", mar=c(0,0,0,0))
+plot(network, 
+    #layout=layout.sphere,
+    #layout=layout.circle,
+    layout=layout.fruchterman.reingold,
+    vertex.color = pcol,          # Node color
+    vertex.label.color="white",
+    vertex.frame.color = "white",   # Node border color
+    vertex.shape= "circle",         # One of “none”, “circle”, “square”, “csquare”, “rectangle” “crectangle”, “vrectangle”, “pie”, “raster”, or “sphere”
+    vertex.size=deg+4,                  # Size of the node (default is 15)
+    #vertex.size2=NA,
+    edge.color = "grey50",
+    #edge.arrow.size=0
+    )
+legend("topleft", 
+       legend=levels(as.factor(nodecats)), 
+       col = pcol_o, 
+       bty = "n", 
+       pch=20 , 
+       pt.cex = 3, 
+       cex = 1.5, 
+       text.col=pcol_o, 
+       horiz = FALSE, 
+       inset = c(0.1, 0.1))
+
+
+```
+
+## How is the concentration of a sample influencing capture sensitivity ?
+
+
+```{r, fig.width = 15, fig.height = 8}
+w = which(is.na(wdata$`Production Reads`))
+pcol = brewer.pal(9, "Blues")[-1] 
+## a ramp of colors 
+pcol = colorRampPalette( pcol )(19)
+
+
+wdata[-w,] %>% mutate(NCS = `Capture Sensitivity (CS) DP1` / `Production Reads`) %>%  ggplot( aes(x = `Endogenous DNA (qPCR - pg/ul)`, y = `Capture Sensitivity (CS) DP1`)) +
+  #geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `% Endogenous DNA`), alpha = 0.5 ) +
+  #geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = log10(`Production Reads`)), alpha = 0.5 ) +
+  geom_point(aes(fill = `Capture Pool`, shape = `Sequencing Batch`,  size = log10(`Production Reads`)), alpha = 0.5 ) +
+  geom_smooth(  method = "loess") +
+  scale_shape_manual(values=c(21, 22, 23)) +
+  #scale_fill_brewer(palette = "Set1") +
+  scale_fill_manual(values = rainbow(nlevels(wdata$`Capture Pool`)) ) +
+  guides(fill = guide_legend(override.aes = list(size = 5, color = rainbow(nlevels(wdata$`Capture Pool`))) ) ) +
+  labs(title = "Associations beteween Endogenous DNA concentration and capture Sensitivity", 
+       subtitle ="     as structured by sequencing batch") 
+  
+
+```
+
+
+```{r}
+
+
+wdata[-w,] %>% ggplot( aes(y = `Endogenous DNA (qPCR - pg/ul)`, x = `Capture Pool`)) +
+  geom_boxplot(fill = gray.colors(nlevels(wdata$`Capture Pool`) ), outlier.colour="red", outlier.shape=16, outlier.size=2, notch=FALSE) +
+  geom_jitter(shape=16, position=position_jitter(0.2), color = "blue") +
+  labs(title = "eDNA concentration by capture pool") 
+  
+
+```
+
+## Univariate ANOVA on Summary Statistics
+
+```{r, message = FALSE}
+
+cols2test = c(2:3, 4:23, 25, 30)
+UnivarateANOVA = matrix(NA, length(cols2test), 2)
+for(i in 1:length(cols2test) ){
+  x = unlist(wdata[,cols2test[i] ])
+  test = class( x )
+  ###
+  
+    fit = lm(wdata$`Capture Sensitivity (CS) DP1` ~  x)
+  
+  ###
+  a = anova(fit)
+  eta = a[1,2]/sum(a[,2])
+  pval = a[1, 5]
+  out = c(eta, pval)
+  ##
+  UnivarateANOVA[i, ] = out
+  }
+
+rownames(UnivarateANOVA) = colnames(wdata)[cols2test]
+colnames(UnivarateANOVA) = c("eta","pval")
+
+## order
+o = order(UnivarateANOVA[,1], decreasing = TRUE)
+UnivarateANOVA = UnivarateANOVA[o,]
+
+```
+
+
+```{r, fig.width = 20, fig.height = 8}
+df = tibble(ID = rownames(UnivarateANOVA), eta = UnivarateANOVA[,1], pvals = UnivarateANOVA[,2])
+### maintain model order for the plot 
+df$ID <- factor(df$ID, levels = df$ID)
+
+### plot
+(
+  p <- df %>% ggplot( aes( x = ID, y = eta ) ) +
+    geom_bar(stat="identity", aes(fill = log10(pvals) )) +
+    labs(title = "Univariate ANOVA for capture sensitivity")+
+    theme(axis.text.x = element_text(angle = 45,  hjust = 1))
+)
+```
+
+
+
 ## A multivariate model to explain how sample quality, and methodological choice influences Capture Sensitivity
 
 ```{r, fig.width = 15, fig.height = 8}
@@ -378,6 +735,15 @@ fit = lm( `Capture Sensitivity (CS) DP1` ~ `Total DNA Concentration (ng/ul)` +
             `Unique Reads`
             , data = wdata )
 
+fit = lm( `Capture Sensitivity (CS) DP1` ~ `Total DNA Concentration (ng/ul)` + 
+            `Endogenous DNA (qPCR - pg/ul)` +
+            `% Endogenous DNA` +
+            `TotalDNA_inHyb` + 
+            `Production Reads` +
+            `Unique Reads`
+            , data = wdata )
+
+
 ##############################
 ## are model residuals normal ?
 ##############################
@@ -392,16 +758,17 @@ W = shapiro.test(residuals(fit))
 (a = anova(fit) )
 eta = a[, 2]/ sum(a[,2])
 names(eta) = rownames(a)
-df = tibble(ID = names(eta) , eta = eta, pvals = a[, 5])
 
-### maintain model order for the plot 
-df$ID <- factor(df$ID, levels = df$ID)
 
+summary(fit)
 
 ```
 
 
 ```{r, fig.width = 15, fig.height = 8}
+df = tibble(ID = names(eta) , eta = eta, pvals = a[, 5])
+### maintain model order for the plot 
+df$ID <- factor(df$ID, levels = df$ID)
 
 ### plot
 (
@@ -415,24 +782,11 @@ df$ID <- factor(df$ID, levels = df$ID)
 ```
 
 
-```{r, fig.width = 10, fig.height = 8}
-w = which(is.na(wdata$`Production Reads`))
-pcol = brewer.pal(9, "Blues")[-1] 
-## a ramp of colors 
-pcol = colorRampPalette( pcol )(19)
 
 
-wdata[-w,] %>% ggplot( aes(x = `Endogenous DNA (qPCR - pg/ul)`, y = `Capture Sensitivity (CS) DP1`)) +
-  #geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `% Endogenous DNA`), alpha = 0.5 ) +
-  #geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = log10(`Production Reads`)), alpha = 0.5 ) +
-  geom_point(aes(fill = `Capture Pool`, shape = `Sequencing Batch`,  size = log10(`Production Reads`)), alpha = 0.5 ) +
-  geom_smooth(  method = "loess") +
-  scale_shape_manual(values=c(21, 22, 23)) +
-  #scale_fill_brewer(palette = "Set1") +
-  scale_fill_manual(values = rainbow(nlevels(wdata$`Capture Pool`)) ) +
-  guides(fill = guide_legend(override.aes = list(size = 5, color = rainbow(nlevels(wdata$`Capture Pool`))) ) ) +
-  labs(title = "Associations beteween Endogenous DNA concentration and capture Sensitivity", 
-       subtitle ="     as structured by sequencing batch") 
-  
 
-```
+
+
+
+
+
