@@ -40,7 +40,7 @@ library(car)
 
 ### Read in the data and report the variables available in each table
 
-```{r}
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
 #######################
 ## Read in the data
 #######################
@@ -58,11 +58,20 @@ names(mydata) = n
 lapply(mydata, names)
 ```
 
+## Add average fragment length from Table S1 to Table S2
+
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+m = match( unlist( mydata[[2]][,1] ), unlist( mydata[[1]][,1]  ) )
+
+mydata[[2]] =  as_tibble( cbind( mydata[[2]] , mydata[[1]][m,8] ) )
+
+```
+
+
 ## Add the data from Table S2 to Table S4 
 
- - include a new variable accounting for the total amount of DNA used in a hybridization
 
-```{r}
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
 m = match( unlist( mydata[[4]][,1] ), unlist( mydata[[2]][,1]  ) )
 
 mydata[[4]] =  as_tibble( cbind( mydata[[4]][,1], mydata[[2]][m, -1], mydata[[4]][, -1] ) )
@@ -75,9 +84,9 @@ mydata[[4]] = mydata[[4]] %>% mutate_if(is.character, as.factor)
 ## Set the working data frame to wdata
 wdata = mydata[[4]]
 
-wdata = wdata %>% mutate(TotalDNA_inHyb = 1)
-w = which(wdata$`Sequencing Batch` == 'SeqBatch 3')
-wdata$TotalDNA_inHyb[w] = 2
+#wdata = wdata %>% mutate(TotalDNA_inHyb = 1)
+#w = which(wdata$`Sequencing Batch` == 'SeqBatch 3')
+#wdata$TotalDNA_inHyb[w] = 2
 
 ```
 
@@ -85,10 +94,9 @@ wdata$TotalDNA_inHyb[w] = 2
 
 ## Add the data from Table S2 to Table Downsampled
 
- - include a new variable accounting for the total amount of DNA used in a hybridization
 
-```{r}
-m = match( unlist( mydata[[6]][,1] ), unlist( mydata[[6]][,1]  ) )
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+m = match( unlist( mydata[[6]][,1] ), unlist( mydata[[2]][,1]  ) )
 
 mydata[[6]] =  as_tibble( cbind( mydata[[6]][,1], mydata[[2]][m, -1], mydata[[6]][, -1] ) )
 
@@ -100,9 +108,9 @@ mydata[[6]] = mydata[[6]] %>% mutate_if(is.character, as.factor)
 ## Set the working data frame to wdata
 downdata = mydata[[6]]
 
-downdata = downdata %>% mutate(TotalDNA_inHyb = 1)
-w = which(downdata$`Sequencing Batch` == 'SeqBatch 3')
-downdata$TotalDNA_inHyb[w] = 2
+#downdata = downdata %>% mutate(TotalDNA_inHyb = 1)
+#w = which(downdata$`Sequencing Batch` == 'SeqBatch 3')
+#downdata$TotalDNA_inHyb[w] = 2
 
 ```
 
@@ -110,64 +118,134 @@ downdata$TotalDNA_inHyb[w] = 2
 ## Using the funtions in the NILC R package, estimate a correlation matrix among all variables in the study
 
 
-```{r, error=FALSE, warning=FALSE, message=FALSE}
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
 CorMat = Test_DF_Correlations( wdata ) 
 rownames(CorMat[[1]]) = colnames(CorMat[[1]]) = names( wdata )
 rownames(CorMat[[2]]) = colnames(CorMat[[2]]) = names( wdata )
+
+write.table(CorMat[[1]], file = "summary_tables/FullData_Correlations.txt",
+            row.names = TRUE, col.names = TRUE, sep = "\t", quote = FALSE)
 ```
 
 
-```{r, fig.width = 15, fig.height = 10}
-corrplot(CorMat[[1]][-1,-1], 
+```{r, fig.width = 15, fig.height = 10,  echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+pdf("pdf_figures/CorrelationPlot_FullDataSet.pdf", width = 15, height = 10)
+
+corrplot(CorMat[[1]], 
          order = "hclust",
-         addrect = 6,
+         addrect = 4,
          tl.col = "red", 
          tl.cex = 0.95,  
          tl.srt = 45, method = "cir",
-         p.mat = CorMat[[2]][-1,-1],
+         p.mat = CorMat[[2]],
          insig = "label_sig",
          sig.level = c(.001, .01, .05), 
          #sig.level = 0.05,
          pch.cex = 1.0, 
          pch.col = "purple")
+
+dev.off()
+
+
+corrplot(CorMat[[1]], 
+         order = "hclust",
+         addrect = 4,
+         tl.col = "red", 
+         tl.cex = 0.95,  
+         tl.srt = 45, method = "cir",
+         p.mat = CorMat[[2]],
+         insig = "label_sig",
+         sig.level = c(.001, .01, .05), 
+         #sig.level = 0.05,
+         pch.cex = 1.0, 
+         pch.col = "purple")
+
+
 ```
 
 
 ## Correlation matrix for the downsampled data
 
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
-DownCorMat = Test_DF_Correlations( downdata ) 
-rownames(DownCorMat[[1]]) = colnames(DownCorMat[[1]]) = names( downdata )
-rownames(DownCorMat[[2]]) = colnames(DownCorMat[[2]]) = names( downdata )
+## exclude those samples that do not have 1.5M reads
+r = which(downdata$`Production Reads` != 1500000)
+##
+
+## remove production reads and production bases from correlation matrix as the data has been downsampled to that 1.5M
+DownCorMat = Test_DF_Correlations( downdata[-r,-c(1,12:13)] ) 
+
+##
+rownames(DownCorMat[[1]]) = colnames(DownCorMat[[1]]) = names( downdata )[-c(1,12:13)]
+rownames(DownCorMat[[2]]) = colnames(DownCorMat[[2]]) = names( downdata )[-c(1,12:13)]
+
+write.table(DownCorMat[[1]], file = "summary_tables/DownSampleData_1.5M_Correlations.txt",
+            row.names = TRUE, col.names = TRUE, sep = "\t", quote = FALSE)
+
+
 ```
 
 
-```{r, fig.width = 15, fig.height = 10}
-corrplot(DownCorMat[[1]][-1,-1], 
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
+pdf("pdf_figures/CorrelationPlot_DownSampled_DataSet.pdf", width = 15, height = 10)
+corrplot(DownCorMat[[1]], 
          order = "hclust",
-         addrect = 7,
+         addrect = 6,
          tl.col = "red", 
          tl.cex = 0.95,  
          tl.srt = 45, method = "cir",
-         p.mat = DownCorMat[[2]][-1,-1],
+         p.mat = DownCorMat[[2]],
          insig = "label_sig",
          sig.level = c(.001, .01, .05), 
          #sig.level = 0.05,
          pch.cex = 1.0, 
          pch.col = "purple")
+dev.off()
+
+corrplot(DownCorMat[[1]], 
+         order = "hclust",
+         addrect = 6,
+         tl.col = "red", 
+         tl.cex = 0.95,  
+         tl.srt = 45, method = "cir",
+         p.mat = DownCorMat[[2]],
+         insig = "label_sig",
+         sig.level = c(.001, .01, .05), 
+         #sig.level = 0.05,
+         pch.cex = 1.0, 
+         pch.col = "purple")
+
 ```
+
+## Extracting and plotting only the correlations for capture sensitivity @DP1
+
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 8}
+x = DownCorMat[[1]][, "DP1" ]
+x = sort(x)
+x = data.frame(CS = x)
+
+pdf("pdf_figures/CS_@DP1_CorrelationBarPlot.pdf", width = 15, height = 6)
+par(mar = c(15, 10,3,3))
+moose_barplot(data = x, column_to_plot = "CS", labels_vec = rownames(x) , rot_angle = 45, pcol = "blue", pmain = "Down Sampled Data (1.5M ProductionReads): Capture Sensitivity @DP1 Correlations")
+dev.off()
+
+par(mar = c(15, 10,3,3))
+moose_barplot(data = x, column_to_plot = "CS", labels_vec = rownames(x) , rot_angle = 45, pcol = "blue", pmain = "Down Sampled Data (1.5M ProductionReads): Capture Sensitivity @DP1 Correlations")
+
+
+```
+
 
 ## Distribution of summary statistics
 
 Are the distributions normal??
 
-```{r, fig.width = 15, fig.height = 8}
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 8}
 par(mfrow = c(2,4))
 invisible( 
   sapply(24:30, function(i){
   d = na.omit( unlist( wdata[, i] ) )
   Wstat = signif( shapiro.test( d )$statistic , d = 3)
-  plot( density( d) , lwd = 4, col = "limegreen", 
+  plot( density( d) , lwd = 6, col = "limegreen", 
        main = paste0( colnames(wdata)[i], ";  shaprio W = ", Wstat)  )
   })
 )
@@ -175,19 +253,20 @@ invisible(
 ```
 
 
-## Explicity Univariate Analysis:
+## Explicity Univariate Analysis on complete data set:
 
 ### EF, LC, CS, CSp: as influenced by site, DNA [concentration], %eDNA, fragment size, pool, amount of DNA in hybridaztion, hybridization, Sequencing run, production reads
 
 
-```{r}
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
 ## using wdata data frame as input
-dep_cols = 24:30
-ind_cols = c(2, 5:11,15)
+dep_cols = 14:31
+ind_cols = c(1:3, 5:12)
 
 UnivarMat = lapply(dep_cols, function(dep){
   out = sapply(ind_cols, function(ind){
     df = data.frame( dep = unlist(wdata[, dep]), ind = unlist(wdata[, ind]) )
+    ## Rank Normal transformation of the data
     df$dep = rntransform( df$dep )
     fit = lm( dep ~ ind, data = df)
     s = summary(fit)
@@ -207,19 +286,29 @@ UnivarMat = lapply(dep_cols, function(dep){
   out = t(out)
   rownames(out) = colnames(wdata)[ind_cols]
   ##
-  return(out)
+  return(out[, c(1:3,6)])
   })
 
 names(UnivarMat) = colnames(wdata)[dep_cols]
 
+for( i in 1:length(UnivarMat) ){
+  x = UnivarMat[[i]]
+  n = names(UnivarMat)[i]
+  n = gsub(" ","", n)
+  n = paste0("summary_tables/FullData_Univariate_", n, "_VarExp.txt")
+  write.table(x, file = n, row.names = TRUE, col.names = TRUE, sep = "\t", quote = FALSE)
+  }
+
 ```
 
 
-```{r, fig.width = 15, fig.height = 10}
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
 testmat = sapply(1:length(UnivarMat), function(x){ return( UnivarMat[[x]][,1] ) })
 pmat = sapply(1:length(UnivarMat), function(x){ return( UnivarMat[[x]][,6] ) })
 ####
 colnames(testmat) = names(UnivarMat)
+
+pdf("pdf_figures/FullData_UnivariateVarExp.pdf", width = 15, height = 10)
 corrplot(testmat,
          tl.col = "red", 
          tl.cex = 0.95,  
@@ -230,23 +319,50 @@ corrplot(testmat,
          #sig.level = 0.05,
          pch.cex = 1.0, 
          pch.col = "purple")
+dev.off()
+
+# corrplot(testmat,
+#          tl.col = "red", 
+#          tl.cex = 0.95,  
+#          tl.srt = 45, method = "cir",
+#          p.mat = pmat,
+#          insig = "label_sig",
+#          sig.level = c(.001, .01, .05), 
+#          #sig.level = 0.05,
+#          pch.cex = 1.0, 
+#          pch.col = "purple")
+
+
+col <- colorRampPalette(RColorBrewer::brewer.pal(9, "RdBu") )
+corrplot(testmat,
+         tl.col = "red", 
+         tl.cex = 0.95,  
+         tl.srt = 45, method = "color",
+         col = col(200),
+         addCoef.col = "grey25",
+         pch.cex = 1.0, 
+         pch.col = "purple")
+
+
 
 ```
 
-## Explicity Univariate Analysis on downsampled data:
+## Explicity Univariate Analysis on Downsampled data including only those samples with 1.5M Production Reads:
 
 ### EF, LC, CS, CSp: as influenced by site, DNA [concentration], %eDNA, fragment size, pool, amount of DNA in hybridaztion, hybridization, Sequencing run, production reads
 
 
-```{r}
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+## which downsampled data did not have 1.5M reads ??
+w = which(downdata$`Production Reads` < 1500000) ## 274 samples left
 ## using wdata data frame as input
-dep_cols = 24:31
-ind_cols = c(2, 5:11, 15)
+dep_cols = 14:32
+ind_cols = c(1:3, 5:11)
 #ind_cols = c(2, 5:23)
 
-UnivarMat = lapply(dep_cols, function(dep){
+UnivarMat_DOWNSAM = lapply(dep_cols, function(dep){
   out = sapply(ind_cols, function(ind){
-    df = data.frame( dep = unlist(downdata[, dep]), ind = unlist(downdata[, ind]) )
+    df = data.frame( dep = unlist(downdata[-w, dep]), ind = unlist(downdata[-w, ind]) )
     df$dep = rntransform( df$dep )
     fit = lm( dep ~ ind, data = df)
     s = summary(fit)
@@ -269,16 +385,28 @@ UnivarMat = lapply(dep_cols, function(dep){
   return(out)
   })
 
-names(UnivarMat) = colnames(downdata)[dep_cols]
+names(UnivarMat_DOWNSAM) = colnames(downdata)[dep_cols]
+
+
+for( i in 1:length(UnivarMat_DOWNSAM) ){
+  x = UnivarMat_DOWNSAM[[i]]
+  n = names(UnivarMat_DOWNSAM)[i]
+  n = gsub(" ","", n)
+  n = paste0("summary_tables/DownSampleData_1.5M_Univariate_", n, "_VarExp.txt")
+  write.table(x, file = n, row.names = TRUE, col.names = TRUE, sep = "\t", quote = FALSE)
+  }
+
 
 ```
 
 
-```{r, fig.width = 15, fig.height = 10}
-testmat = sapply(1:length(UnivarMat), function(x){ return( UnivarMat[[x]][,1] ) })
-pmat = sapply(1:length(UnivarMat), function(x){ return( UnivarMat[[x]][,6] ) })
+```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
+testmat = sapply(1:length(UnivarMat_DOWNSAM), function(x){ return( UnivarMat_DOWNSAM[[x]][,1] ) })
+pmat = sapply(1:length(UnivarMat_DOWNSAM), function(x){ return( UnivarMat_DOWNSAM[[x]][,6] ) })
 ####
-colnames(testmat) = names(UnivarMat)
+colnames(testmat) = names(UnivarMat_DOWNSAM)
+
+pdf("pdf_figures/DownSampledData_1.5Monly_UnivariateVarExp.pdf", width = 15, height = 10)
 corrplot(testmat,
          tl.col = "red", 
          tl.cex = 0.95,  
@@ -289,37 +417,52 @@ corrplot(testmat,
          #sig.level = 0.05,
          pch.cex = 1.0, 
          pch.col = "purple")
+dev.off()
+
+col <- colorRampPalette(RColorBrewer::brewer.pal(9, "RdBu") )
+corrplot(testmat,
+         tl.col = "red", 
+         tl.cex = 0.95,  
+         tl.srt = 45, method = "color",
+         col = col(200),
+         addCoef.col = "grey25",
+         pch.cex = 1.0, 
+         pch.col = "purple")
+
+
 
 ```
 
 
-## Multivariate model
+
+## Multivariate model of the Full Data Set
 
 ```{r, message = FALSE, warning = FALSE, error=FALSE}
 ## using wdata data frame as input
-dep_cols = 24:30
+dep_cols = 14:31
 
 MultivarMat = t( sapply(dep_cols, function(i){
     dep = rntransform( unlist( wdata[ ,i] ) )
     ###########
-    fit0 = lm( dep ~ `Site`+ 
+    fit0 = lm( dep ~ `Subspecies` + `Site` +
                 `Total DNA Concentration (ng/ul)` +
                 `% Endogenous DNA` +
-                #`Starting DNA  (ug)` +
+                 `Average Fragment Size` +
+                `Starting DNA  (ug)` +
                 `Capture Pool` +
                 `Sequencing Batch` +
-                `Production Reads` 
-                , data = wdata)
+                `Production Reads` , data = wdata)
     
     ###############
     
     fit = lm( dep ~ `Production Reads` + 
                 `Sequencing Batch` +
                 `Capture Pool` +
-                #`Starting DNA  (ug)` +
+                `Starting DNA  (ug)` +
+                `Average Fragment Size` +
                 `% Endogenous DNA` + 
                 `Total DNA Concentration (ng/ul)` + 
-                `Site`, data = wdata)
+                `Site` + `Subspecies`, data = wdata)
     
     s = summary(fit)
     #####
@@ -328,13 +471,13 @@ MultivarMat = t( sapply(dep_cols, function(i){
     #####
     a = anova(fit)
     n = gsub(" ","",rownames(a)); n = gsub("`","", n )
-    eta = a[,2]/sum(a[,2]); names(eta) = paste0("etasq_", n )
-    pval = a[, 5]; names(pval) = paste0("pval_", n )
+    eta = a[,2]/sum(a[,2]); names(eta) = paste0("etasq_fit_", n )
+    pval = a[, 5]; names(pval) = paste0("pval_fit_", n )
     #####
     a = anova(fit0)
     n = gsub(" ","",rownames(a)); n = gsub("`","", n )
-    eta0 = a[,2]/sum(a[,2]); names(eta0) = paste0("etasq_0_", n )
-    pval0 = a[,5 ]; names(pval0) = paste0("pval_0_", n )
+    eta0 = a[,2]/sum(a[,2]); names(eta0) = paste0("etasq_fit0_", n )
+    pval0 = a[,5 ]; names(pval0) = paste0("pval_fit0_", n )
     ####
     o = c(o, eta0, pval0, eta, pval)
     #####################
@@ -343,10 +486,10 @@ MultivarMat = t( sapply(dep_cols, function(i){
     a = Anova(fit, type = "II")
     eta_type2 = a[,1]/sum(a[,1], na.rm = TRUE) 
     n = rownames(a); n = gsub(" ","", n); n = gsub("`","", n)
-    names(eta_type2) = paste0("eta_type2_", n)
+    names(eta_type2) = paste0("eta_fit_T2_", n)
     
     pval_type2 = a[,4]; 
-    names(pval_type2) = paste0("pval_type2", n)
+    names(pval_type2) = paste0("pval_fit_T2", n)
     
     #####
     out = c(o, eta_type2, pval_type2)
@@ -356,38 +499,43 @@ MultivarMat = t( sapply(dep_cols, function(i){
 )
 rownames(MultivarMat) = colnames(wdata)[dep_cols]
 
-
+n = "summary_tables/FullData_Multivariate_Models.txt"
+write.table(MultivarMat, file = n, row.names = TRUE, col.names = TRUE, quote = FALSE, sep = "\t")
 
 
 
 ```
 
+### Multivariate model of the downsampled data set limited to only those samples with 1.5M production reads
+
 
 ```{r, message = FALSE, warning = FALSE, error=FALSE}
+w = which(downdata$`Production Reads` < 1500000) ## 274 samples left
+
+
 ## using wdata data frame as input
-dep_cols = 24:31
+dep_cols = 14:32
 
 MultivarMat_DOWNSAM = t( sapply(dep_cols, function(i){
-    dep = rntransform( unlist( downdata[ ,i] ) )
+    dep = rntransform( unlist( downdata[ -w,i] ) )
     ###########
-    fit0 = lm( dep ~ `Site`+ 
+    fit0 = lm( dep ~ `Subspecies` + `Site` +
                 `Total DNA Concentration (ng/ul)` +
                 `% Endogenous DNA` +
-                #`Starting DNA  (ug)` +
+                 `Average Fragment Size` +
+                `Starting DNA (ug)` +
                 `Capture Pool` +
-                `Sequencing Batch` +
-                `Production Reads` 
-                , data = downdata)
+                `Sequencing Batch`  , data = downdata[-w, ])
     
     ###############
     
-    fit = lm( dep ~ `Production Reads` + 
-                `Sequencing Batch` +
+    fit = lm( dep ~ `Sequencing Batch` +
                 `Capture Pool` +
-                #`Starting DNA  (ug)` +
+                `Starting DNA (ug)` +
+                `Average Fragment Size` +
                 `% Endogenous DNA` + 
                 `Total DNA Concentration (ng/ul)` + 
-                `Site`, data = downdata)
+                `Site` + `Subspecies`, data = downdata[-w, ])
     
     s = summary(fit)
     #####
@@ -396,13 +544,13 @@ MultivarMat_DOWNSAM = t( sapply(dep_cols, function(i){
     #####
     a = anova(fit)
     n = gsub(" ","",rownames(a)); n = gsub("`","", n )
-    eta = a[,2]/sum(a[,2]); names(eta) = paste0("etasq_", n )
-    pval = a[, 5]; names(pval) = paste0("pval_", n )
+    eta = a[,2]/sum(a[,2]); names(eta) = paste0("etasq_fit_", n )
+    pval = a[, 5]; names(pval) = paste0("pval_fit_", n )
     #####
     a = anova(fit0)
     n = gsub(" ","",rownames(a)); n = gsub("`","", n )
-    eta0 = a[,2]/sum(a[,2]); names(eta0) = paste0("etasq_0_", n )
-    pval0 = a[,5 ]; names(pval0) = paste0("pval_0_", n )
+    eta0 = a[,2]/sum(a[,2]); names(eta0) = paste0("etasq_fit0_", n )
+    pval0 = a[,5 ]; names(pval0) = paste0("pval_fit0_", n )
     ####
     o = c(o, eta0, pval0, eta, pval)
     #####################
@@ -411,10 +559,10 @@ MultivarMat_DOWNSAM = t( sapply(dep_cols, function(i){
     a = Anova(fit, type = "II")
     eta_type2 = a[,1]/sum(a[,1], na.rm = TRUE) 
     n = rownames(a); n = gsub(" ","", n); n = gsub("`","", n)
-    names(eta_type2) = paste0("eta_type2_", n)
+    names(eta_type2) = paste0("eta_fit_T2_", n)
     
     pval_type2 = a[,4]; 
-    names(pval_type2) = paste0("pval_type2", n)
+    names(pval_type2) = paste0("pval_fit_T2_", n)
     
     #####
     out = c(o, eta_type2, pval_type2)
@@ -425,103 +573,140 @@ MultivarMat_DOWNSAM = t( sapply(dep_cols, function(i){
 rownames(MultivarMat_DOWNSAM) = colnames(downdata)[dep_cols]
 
 
+n = "summary_tables/DownSampleData_1.5M_Multivariate_Models.txt"
+write.table(MultivarMat_DOWNSAM, file = n, row.names = TRUE, col.names = TRUE, quote = FALSE, sep = "\t")
 
 
 
-```
-
-
-```{r}
-rotate_x <- function(data, column_to_plot, labels_vec, rot_angle, pcol = "steelblue", pmain = "") {
-    plt <- barplot(data[[column_to_plot]], col=pcol, xaxt="n", ylim = c(0, 0.35), main = pmain)
-    abline(h = seq(0.1, 0.3, by = 0.1), lty = 2, col = "grey50" )
-    text(plt, par("usr")[3], labels = labels_vec, srt = rot_angle, adj = c(1.1,1.1), xpd = TRUE, cex=1.2) 
-}
 
 
 ```
 
 ## DownSampled Variance Explained
 
-```{r, fig.width = 10, fig.height = 10}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 10, fig.height = 10}
 pcols = RColorBrewer::brewer.pal(3, "Dark2")
 
 ###
 par(mfrow = c(3, 1), mar = c(8,3,3,1))
 ####
-d = as.data.frame(UnivarMat$DP1[1:8, ])
+d = as.data.frame(UnivarMat_DOWNSAM$DP1)
 rownames(d) = gsub(" ","",rownames(d))
-rotate_x( d, 'Rsq', row.names(d), 25, pcol = pcols[1], 
-          pmain = "Capture Sensitivity (DP1) Univariate ANOVAs")
+moose_barplot( d, 'Rsq', row.names(d), 25, pcol = pcols[1], 
+          pmain = "Capture Sensitivity (DP1) Univariate ANOVAs", pylim = c(0,1))
 
 #####
-d = data.frame( d = MultivarMat_DOWNSAM["DP1", c(4:8) ] )
-rownames(d) = gsub("etasq_0_","",rownames(d))
-rotate_x( d , 'd', row.names(d) , 25, pcol =  pcols[2], 
-          pmain = "Capture Sensitivity (DP1) Type I Multivariate ANOVAs")
+d = data.frame( d = MultivarMat_DOWNSAM["DP1",  c(4:10)] )
+rownames(d) = gsub("etasq_fit0_","",rownames(d))
+moose_barplot( d , 'd', row.names(d) , 25, pcol =  pcols[2], 
+          pmain = "Capture Sensitivity (DP1) Type I Multivariate ANOVAs", pylim = c(0,0.35) )
 
 #####
-d = data.frame( d = MultivarMat_DOWNSAM["DP1", c(16:21) ] )
-rownames(d) = gsub("etasq_","",rownames(d))
-rotate_x( d , 'd', row.names(d) , 25, pcol =  pcols[3], 
-          pmain = "Capture Sensitivity (DP1) Type I Multivariate ANOVAs")
+d = data.frame( d = MultivarMat_DOWNSAM["DP1", c(20:25)  ] )
+rownames(d) = gsub("etasq_fit_","",rownames(d))
+moose_barplot( d , 'd', row.names(d) , 25, pcol =  pcols[3], 
+          pmain = "Capture Sensitivity (DP1) Type I Multivariate ANOVAs", pylim = c(0,0.35) )
 
 
 ```
 
 
-```{r, fig.width = 8, fig.height = 6}
-u = UnivarMat$DP1[1:8, 1]
-m0 = MultivarMat_DOWNSAM["DP1", c(4:8) ]
-m0 = c(m0[1:2], NA, m0[3], NA, m0[4], NA, m0[5])
-m =  MultivarMat_DOWNSAM["DP1", c(16:21) ] 
-m = c(m[6:5], NA, m[4], m[2], m[3], NA, m[1])
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 8, fig.height = 6}
+## OK THIS IS SOME DAMN UGLY CODE !!!
+
+## univariate etasq
+u = UnivarMat_DOWNSAM$DP1[, 1]
+u = u[c(3,2,1,4:7,10,9,8)]
+## multvariate Etasq from fit0
+m0 = MultivarMat_DOWNSAM["DP1", c(4:10) ]
+m0 = c( m0[1:2], NA, m0[3], NA, m0[4:7], NA)
+## multvariate Etasq from fit
+m =  MultivarMat_DOWNSAM["DP1", c(20:25) ] 
+m = c( NA, m[6], NA, m[5], NA, m[4:3], NA, m[2:1])
 
 varexp = c(u, m0, m)
 n = names(u)
 l = c(n , n, n)
-mod = c( rep("univar", length(u))  , rep("multivar_0", length(u)) , rep("multivar", length(u)) )
+mod = c( rep("univar", length(u))  , rep("fit0", length(u)) , rep("fit", length(u)) )
 ###
-d = data.frame( label = names( UnivarMat$DP1[1:8, 1]) , 
-                   univar = UnivarMat$DP1[1:8, 1] , 
-                   multi0 = c(m0[1:2], NA, m0[3], NA, m0[4], NA, m0[5]) ,
-                   multi = c(m[6:5], NA, m[4], m[2], m[3], NA, m[1])
-                   )
 
 d = data.frame(labels = l, varexp = varexp, model = mod)
   
 ### turn data frame into tibble
 d = as_tibble(d)
+d$labels <- factor(d$labels, levels = d$labels[10:1])
 
 ## plot
-d %>% ggplot(aes(x = varexp, y = labels)) + 
+p = d %>% ggplot(aes(x = varexp, y = labels)) + 
   geom_point( aes(color = model, shape = model), size = 7, alpha = 0.85) +
   scale_color_manual(values = RColorBrewer::brewer.pal(3, "Set1") ) +
   labs(title = paste0("Variance explained in capture sensitivity \n derived from univariate and type I multivariate ANOVAs"),
-       caption = paste0( "multivar model = CS ~ ProdReads + SeqBatch + CapPool + %eDNA + TotalDNACon + Site\nmultivar_0 model has the order of explanatory variables reversed") )
+       caption = paste0( "fit0 = CS@DP1 ~ `Subspecies` + `Site` + `Total DNA Concentration` + `% Endogenous DNA` + 
+       `Average Fragment Size` + `Starting DNA` + `Capture Pool` + `Sequencing Batch`\n\nmodel `fit` has the order of explanatory variables reversed") )
+
+pdf("pdf_figures/DownSampled_CS@DP1_Uni-n-Multi_ANOVA_etasq.pdf", width = 10, height = 8)
+p
+dev.off()
+
+p
 
 ```
 
 
-## How are production reads influencing library complexity ?
 
-```{r, fig.width = 10, fig.height = 8}
+## Library Complexity and CS @DP1
+
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 5}
 w = which(is.na(wdata$`Production Reads`))
+
 pcol = brewer.pal(9, "Blues")[-1] 
 ## a ramp of colors 
 pcol = colorRampPalette( pcol )(19)
 
-#wdata %>% ggplot( aes(x = `Production Reads`, y = `Enrichment Factor (EF)`)) +
-wdata[-w,] %>% ggplot( aes(x = `Production Reads`, y = `Library Complexity (LC)`)) +
+p = wdata[-w,] %>% ggplot( aes(x = `Unique Reads`, y = `Capture Sensitivity (CS) DP1`)) +
   #geom_point(aes(fill = `Capture Pool`, shape = `Sequencing Batch`,  size = `% Endogenous DNA`), alpha = 0.8 ) +
-  geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `% Endogenous DNA`), alpha = 0.8 ) +
+  geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `Library Complexity (LC)`), alpha = 0.8 ) +
+  #geom_smooth(method = "loess", aes(color = `Sequencing Batch`)) +
   scale_shape_manual(values=c(21, 22, 23)) +
   scale_fill_brewer(palette = "Set1") +
+  #scale_color_manual(values = RColorBrewer::brewer.pal(3,"Set1") ) +
   #scale_fill_manual(values = pcol) +
   guides(fill = guide_legend(override.aes = list(size = 5) ) ) +
-  labs(title = "Associations beteween library complexity and production reads", 
-       subtitle ="   ...  as structured by sequencing batch and capture pool") 
+  labs(title = "Associations beteween unique reads and capture sensitiviy @DP1", 
+       subtitle ="   ...  as structured by sequencing batch and library complexity") 
+
+######################
+p2 = wdata[-w,] %>% ggplot( aes(x = `Unique Reads`, y = `Library Complexity (LC)`)) +
+  #geom_point(aes(fill = `Capture Pool`, shape = `Sequencing Batch`,  size = `% Endogenous DNA`), alpha = 0.8 ) +
+  geom_point(aes(fill = `Sequencing Batch`, shape = `Sequencing Batch`,  size = `Production Reads`), alpha = 0.8 ) +
+  geom_smooth(method = "loess", aes(color = `Sequencing Batch`)) +
+  scale_shape_manual(values=c(21, 22, 23)) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_manual(values = RColorBrewer::brewer.pal(3,"Set1") ) +
+  #scale_fill_manual(values = pcol) +
+  guides(fill = guide_legend(override.aes = list(size = 5) ) ) +
+  labs(title = "Associations beteween unique reads and library complexity", 
+       subtitle ="   ...  as structured by sequencing batch and production reads") 
+
+########################
+pdf("pdf_figures/CS_vs_UniqueReads.pdf", width = 15, height = 5)
+grid.arrange( p, p2 , nrow = 1)
+dev.off()
+
+grid.arrange( p, p2 , nrow = 1)
   
+
+```
+
+## Unique Reads by hybridization
+
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 6}
+
+w = which(downdata$`Production Reads` < 1500000 )
+######
+par(mfrow = c(2,1))
+boxplot(wdata$`Unique Reads` ~ wdata$`Capture Pool`)
+boxplot(downdata$`Unique Reads`[-w] ~ downdata$`Capture Pool`[-w])
 
 ```
 
@@ -535,7 +720,7 @@ wdata[-w,] %>% ggplot( aes(x = `Production Reads`, y = `Library Complexity (LC)`
 
 ## How are production reads influencing library complexity in the down sampled data ?
 
-```{r, fig.width = 20, fig.height = 8}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 20, fig.height = 8}
 w = which(downdata$`Production Reads` < 1500000)
 
 pcol = brewer.pal(9, "Blues")[-1] 
@@ -632,7 +817,7 @@ Now depth in coverage gives us accuracy in genotyping heterozygosity and there i
 ### Below we are asking in a univariate fashion how each of our variables, and sumstat,  correlate with CAPTURE SENSITIVITY. 
 
 
-```{r, fig.width = 15, fig.height = 8}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 8}
 
 #x = sort( CorMat[[1]][-26,26] ); barplot(x)
 
@@ -667,7 +852,7 @@ What can we learn from this analysis?
 
 ### Below we are asking in a univariate fashion how each of our variables, and sumstat, correlate with CAPTURE SENSITIVITY at a uniform production
 
-```{r, fig.width = 20, fig.height = 8}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 20, fig.height = 8}
 
 #x = sort( CorMat[[1]][-26,26] ); barplot(x)
 
@@ -695,7 +880,7 @@ df$ID <- factor(df$ID, levels = df$ID)
 
 ## Build a network of relationships based on correaltion estimates
 
-```{r, message=FALSE, fig.width = 15, fig.height = 10}
+```{r, message = FALSE, warning = FALSE, error=FALSE, message=FALSE, fig.width = 15, fig.height = 10}
 #library(network)
 library(igraph)
 
@@ -763,7 +948,7 @@ legend("bottomleft",
 
 ## Remove redundancies in Network
 
-```{r, message=FALSE, fig.width = 15, fig.height = 10}
+```{r, message = FALSE, warning = FALSE, error=FALSE, message=FALSE, fig.width = 15, fig.height = 10}
 #############################
 ## Data Reductions
 #############################
@@ -834,7 +1019,7 @@ legend("topleft",
 
 ## Remove redundancies in Network and construct with down sampled data
 
-```{r, message=FALSE, fig.width = 10, fig.height = 10}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 10, fig.height = 10}
 #############################
 ## Data Reductions
 #############################
@@ -907,7 +1092,7 @@ legend("topleft",
 ## How is the concentration of a sample influencing capture sensitivity ?
 
 
-```{r, fig.width = 15, fig.height = 8}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 8}
 w = which(is.na(wdata$`Production Reads`))
 pcol = brewer.pal(9, "Blues")[-1] 
 ## a ramp of colors 
@@ -930,7 +1115,7 @@ wdata[-w,] %>% mutate(NCS = `Capture Sensitivity (CS) DP1` / `Production Reads`)
 ```
 
 
-```{r}
+```{r, message = FALSE, warning = FALSE, error=FALSE}
 
 
 wdata[-w,] %>% ggplot( aes(y = `Endogenous DNA (qPCR - pg/ul)`, x = `Capture Pool`)) +
@@ -943,7 +1128,7 @@ wdata[-w,] %>% ggplot( aes(y = `Endogenous DNA (qPCR - pg/ul)`, x = `Capture Poo
 
 ## Univariate ANOVA on Summary Statistics
 
-```{r, message = FALSE}
+```{r, message = FALSE, warning = FALSE, error=FALSE, message = FALSE}
 
 cols2test = c(2:3, 4:23, 25, 30)
 UnivarateANOVA = matrix(NA, length(cols2test), 2)
@@ -973,7 +1158,7 @@ UnivarateANOVA = UnivarateANOVA[o,]
 ```
 
 
-```{r, fig.width = 20, fig.height = 8}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 20, fig.height = 8}
 df = tibble(ID = rownames(UnivarateANOVA), eta = UnivarateANOVA[,1], pvals = UnivarateANOVA[,2])
 ### maintain model order for the plot 
 df$ID <- factor(df$ID, levels = df$ID)
@@ -991,7 +1176,7 @@ df$ID <- factor(df$ID, levels = df$ID)
 
 ## A multivariate model to explain how sample quality, and methodological choice influences Capture Sensitivity
 
-```{r, fig.width = 15, fig.height = 8}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 8}
 library(car)
 ##############################
 ## fit a simple linear model
@@ -1036,7 +1221,7 @@ summary(fit)
 ```
 
 
-```{r, fig.width = 15, fig.height = 8}
+```{r, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 8}
 df = tibble(ID = names(eta) , eta = eta, pvals = a[, 5])
 ### maintain model order for the plot 
 df$ID <- factor(df$ID, levels = df$ID)
