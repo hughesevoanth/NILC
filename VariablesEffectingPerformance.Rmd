@@ -118,7 +118,7 @@ downdata = mydata[[6]]
 ## Using the funtions in the NILC R package, estimate a correlation matrix among all variables in the study
 
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE}
 CorMat = Test_DF_Correlations( wdata ) 
 rownames(CorMat[[1]]) = colnames(CorMat[[1]]) = names( wdata )
 rownames(CorMat[[2]]) = colnames(CorMat[[2]]) = names( wdata )
@@ -128,7 +128,7 @@ write.table(CorMat[[1]], file = "summary_tables/FullData_Correlations.txt",
 ```
 
 
-```{r, fig.width = 15, fig.height = 10,  echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+```{r, fig.width = 15, fig.height = 10,  echo = FALSE, warning = FALSE, message=FALSE, error=FALSE}
 pdf("pdf_figures/CorrelationPlot_FullDataSet.pdf", width = 15, height = 10)
 
 corrplot(CorMat[[1]], 
@@ -185,7 +185,7 @@ write.table(DownCorMat[[1]], file = "summary_tables/DownSampleData_1.5M_Correlat
 ```
 
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
 pdf("pdf_figures/CorrelationPlot_DownSampled_DataSet.pdf", width = 15, height = 10)
 corrplot(DownCorMat[[1]], 
          order = "hclust",
@@ -218,7 +218,7 @@ corrplot(DownCorMat[[1]],
 
 ## Extracting and plotting only the correlations for capture sensitivity @DP1
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 8}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 8}
 x = DownCorMat[[1]][, "DP1" ]
 x = sort(x)
 x = data.frame(CS = x)
@@ -239,7 +239,7 @@ moose_barplot(data = x, column_to_plot = "CS", labels_vec = rownames(x) , rot_an
 
 Are the distributions normal??
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 8}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 8}
 par(mfrow = c(2,4))
 invisible( 
   sapply(24:30, function(i){
@@ -258,7 +258,7 @@ invisible(
 ### EF, LC, CS, CSp: as influenced by site, DNA [concentration], %eDNA, fragment size, pool, amount of DNA in hybridaztion, hybridization, Sequencing run, production reads
 
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE}
 ## using wdata data frame as input
 dep_cols = 14:31
 ind_cols = c(1:3, 5:12)
@@ -302,9 +302,9 @@ for( i in 1:length(UnivarMat) ){
 ```
 
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
 testmat = sapply(1:length(UnivarMat), function(x){ return( UnivarMat[[x]][,1] ) })
-pmat = sapply(1:length(UnivarMat), function(x){ return( UnivarMat[[x]][,6] ) })
+pmat = sapply(1:length(UnivarMat), function(x){ return( UnivarMat[[x]][,4] ) })
 ####
 colnames(testmat) = names(UnivarMat)
 
@@ -352,7 +352,7 @@ corrplot(testmat,
 ### EF, LC, CS, CSp: as influenced by site, DNA [concentration], %eDNA, fragment size, pool, amount of DNA in hybridaztion, hybridization, Sequencing run, production reads
 
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE}
 ## which downsampled data did not have 1.5M reads ??
 w = which(downdata$`Production Reads` < 1500000) ## 274 samples left
 ## using wdata data frame as input
@@ -400,7 +400,7 @@ for( i in 1:length(UnivarMat_DOWNSAM) ){
 ```
 
 
-```{r, echo = FALSE, warnings = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
+```{r, echo = FALSE, warning = FALSE, message=FALSE, error=FALSE, fig.width = 15, fig.height = 10}
 testmat = sapply(1:length(UnivarMat_DOWNSAM), function(x){ return( UnivarMat_DOWNSAM[[x]][,1] ) })
 pmat = sapply(1:length(UnivarMat_DOWNSAM), function(x){ return( UnivarMat_DOWNSAM[[x]][,6] ) })
 ####
@@ -1185,7 +1185,7 @@ fit = lm( `Capture Sensitivity (CS) DP1` ~ `Total DNA Concentration (ng/ul)` +
             `Endogenous DNA (qPCR - pg/ul)` +
             `% Endogenous DNA` +
             `Capture Pool` + 
-            `TotalDNA_inHyb` + 
+            `Starting DNA  (ug)` + 
             `Sequencing Batch` + 
             `Production Reads` +
             `Unique Reads`
@@ -1194,7 +1194,7 @@ fit = lm( `Capture Sensitivity (CS) DP1` ~ `Total DNA Concentration (ng/ul)` +
 fit = lm( `Capture Sensitivity (CS) DP1` ~ `Total DNA Concentration (ng/ul)` + 
             `Endogenous DNA (qPCR - pg/ul)` +
             `% Endogenous DNA` +
-            `TotalDNA_inHyb` + 
+            `Starting DNA  (ug)` + 
             `Production Reads` +
             `Unique Reads`
             , data = wdata )
