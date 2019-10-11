@@ -1,6 +1,6 @@
 #' A Function to describe each feature in a data frame of metabolite data. 
 #'
-#' This function estimates the correlation structure among two factors, using a chi-square test and the Crammer's V statsitic
+#' This function estimates the correlation structure among a factor and a numeric|quantitative trait
 #' @param cat_values a vector of class factor, categorical values
 #' @param num_values a second vector of class numeric
 #' @keywords correlation analysis among factors
