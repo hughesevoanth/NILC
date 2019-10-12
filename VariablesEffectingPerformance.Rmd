@@ -939,14 +939,16 @@ grid.arrange( p, p2 , nrow = 1)
 
 ## Unique Reads by hybridization
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 6}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, error=FALSE, fig.width = 15, fig.height = 15}
 
 w = which(downdata$`Production Reads` < 1500000 )
 ######
-par(mfrow = c(2,1))
-boxplot(wdata$`Unique Reads` ~ wdata$`Capture Pool`)
-boxplot(downdata$`Unique Reads`[-w] ~ downdata$`Capture Pool`[-w])
-
+pcol = c( rep("blue",2), rep("darkblue",2) , rep("green",4) , rep("darkgreen", 2), rep("red",6), rep("darkred",2))
+par(mfrow = c(4,1))
+boxplot( log10(downdata$`OnTarget Reliable Reads`[-w]) ~ downdata$`Capture Pool`[-w], col = pcol, ylab = "log10(on target RR)", main = "OnTarget Reliable Reads")
+boxplot(downdata$Enrichment[-w] ~ downdata$`Capture Pool`[-w], col = pcol, main = "Enrichment")
+boxplot(downdata$LC[-w] ~ downdata$`Capture Pool`[-w], col = pcol, main = "Library Complexity")
+boxplot(downdata$DP1[-w] ~ downdata$`Capture Pool`[-w], col = pcol, main = "Capture Sensitivity @DP1")
 ```
 
   1. Samples in SeqBatch 3 all had 2ug of in the hybridization, hence the large bump in LC.
@@ -956,6 +958,69 @@ boxplot(downdata$`Unique Reads`[-w] ~ downdata$`Capture Pool`[-w])
   1. Increase the total DNA concentration in hybridization reactions (Perry paper did this)
   2. Do not sequence to deeply. 
 
+
+## does %eDNA correlate with production reads ?
+
+```{r}
+cp = sort( na.omit( as.character( unique(wdata$`Capture Pool`) ) ) )
+x = c()
+for(i in 1:length(cp)){
+  w = which(wdata$`Capture Pool` == cp[i])
+  a = cor.test(wdata$`% Endogenous DNA`[w], wdata$`Production Reads`[w])
+  #a = cor.test(wdata$`% Endogenous DNA`[w], wdata$`OnTarget Reliable Reads`[w])
+  out = c(a$estimate, a$p.value)
+  x = rbind(x, out)
+}
+rownames(x) = cp
+colnames(x) = c("rho","pval")
+x
+```
+
+
+## Exclude pool 2 --  Multivariate Modeling of CS @ DP1
+
+  -- Down Sampled Data --
+  
+  -- model :  CS@DP1 ~ subspecies + site + [tDNA] + [eDNA] + %eDNA + fragmentsize + pool + amount_DNA-in-hyb + hybridization + seqbatch + error
+  
+```{r, fig.width = 15, fig.height = 6}
+#w = which(downdata$`Production Reads` < 1500000  ) ## 274 samples left
+w = which(downdata$`Production Reads` < 1500000 | downdata$Pool == "P2" ) ## 200 samples left
+#####
+d = rntransform( unlist( downdata[-w, "DP1"] ) )
+## sub setted model
+# fit0 = lm( d ~ `Subspecies` + `Site` +
+#              `Total DNA Concentration (ng/ul)` + 
+#              #`Endogenous DNA (qPCR - pg/ul)` +
+#              `% Endogenous DNA` +
+#              `Average Fragment Size` +
+#              `Pool` + 
+#              `Starting DNA (ug)` +
+#              `Capture Pool` +
+#              `Sequencing Batch` , data = downdata[-w,])
+# 
+
+## full model !!!
+fit = lm( d ~ `Subspecies` + `Site` +
+             `Total DNA Concentration (ng/ul)` + 
+             `Endogenous DNA (qPCR - pg/ul)` +
+             `% Endogenous DNA` +
+             `Average Fragment Size` +
+             `Pool` + 
+            `Starting DNA (ug)` +
+             `Capture Pool` +
+             `Sequencing Batch` , data = downdata[-w,])
+# anova(fit0, fit)
+###################
+
+a = anova(fit) 
+eta2 = a[, 2]/sum(a[,2]); names(eta2) = rownames(a)
+eta2 = data.frame(labels = rownames(a), eta2 = eta2)
+###
+par(mar = c(6.5, 5,3,3))
+moose_barplot(eta2, "eta2", eta2$labels, 20, pylim = c(0,0.30))
+
+```
 
 ## How are production reads influencing library complexity in the down sampled data ?
 
