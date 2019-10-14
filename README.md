@@ -10,3 +10,12 @@ This git repository holds Supplementary Table 1, 2, 4, and 5 from the 2019 Fonts
 In addition it contains some Rmarkdown scripts and reports used to analyze the data for generating results for the publication itself. 
 
 
+### Installation instructions of the NILC package
+
+	1. insure that the devtools library is installed on your local machine
+		 > ifelse("devtools" %in% rownames(installed.packages()), 
+		 NA, 
+		 install.packages("devtools"))
+		 
+	2. install NILC
+		> devtools::install_github("hughesevoanth/NILC")
