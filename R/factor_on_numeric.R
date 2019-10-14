@@ -8,7 +8,7 @@
 #' @examples
 #' factor_on_numeric()
 factor_on_numeric = function( cat_values , num_values ){
-  wdata = data.frame( cat_values = unlist(cat_values) , num_values = unlist(num_values) )
+  wdata = data.frame( cat_values = unlist(cat_values) , num_values = rntransform( unlist(num_values) ) )
   fit = lm(num_values ~ cat_values , data = wdata)
   adjrsq = summary(fit)$adj.r.squared
   ####
