@@ -9,6 +9,12 @@
 #' factor_on_factor()
 factor_on_factor = function(x,y){
   mytable = table(x,y)
+  w = which( apply(mytable, 1, sum) == 0)
+  if(length(w)> 0){mytable = mytable[-w, ]}
+  ##
+  w = which( apply(mytable, 2, sum) == 0)
+  if(length(w)> 0){mytable = mytable[,-w]}
+  ##
   chi2test = chisq.test(mytable, correct=F)
   N = sum(chi2test$observed)
   chi2 = chi2test$statistic
